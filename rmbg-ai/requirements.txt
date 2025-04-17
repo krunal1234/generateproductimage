@@ -1,11 +1,9 @@
 torch==2.1.0
-diffusers==0.25.0
 transformers==4.36.2
-torchvision
+diffusers==0.25.0
+accelerate==0.23.0
 pillow
-numpy
-typing
-scikit-image
-huggingface_hub
 fastapi
 uvicorn
+briarmbg
+huggingface_hub
