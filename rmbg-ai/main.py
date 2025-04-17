@@ -26,35 +26,25 @@ net = None
 # Pre-load the BriaRMBG model on startup
 @app.on_event("startup")
 def load_model():
-    global net
+    global net, stable_diffusion_pipe
+
+    print("🔄 Downloading BriaRMBG model...")
     model_path = hf_hub_download("briaai/RMBG-1.4", 'model.pth')
+
     net = BriaRMBG()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net.load_state_dict(torch.load(model_path, map_location=device))
     net.to(device)
     net.eval()
+    print("✅ BriaRMBG model loaded.")
 
-    # Load Stable Diffusion model from local checkpoint
-    global stable_diffusion_pipe
-    stable_diffusion_model_path = "./models/stable-diffusion-v1-4/sd-v1-4.ckpt"
-    
-    # Load Stable Diffusion model manually
-    try:
-        # Use weights_only=False to avoid the unpickling error
-        model = torch.load(stable_diffusion_model_path, map_location="cuda" if torch.cuda.is_available() else "cpu", weights_only=False)
-    except Exception as e:
-        raise ValueError(f"Failed to load the model: {e}")
-    
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14")
-    
-    # Construct the Stable Diffusion pipeline using the loaded models
+    print("🔄 Loading Stable Diffusion pipeline from Hugging Face...")
     stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
-        "CompVis/stable-diffusion-v1-4",  # Hugging Face model identifier
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+        "CompVis/stable-diffusion-v1-4",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
     )
-
     stable_diffusion_pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    print("✅ Stable Diffusion pipeline ready.")
 
 # Route to serve index.html
 @app.get("/", response_class=HTMLResponse)
