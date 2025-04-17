@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Image Background Generator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f7;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        header {
+            text-align: center;
+            padding: 1rem 0 2rem;
+        }
+        h1 {
+            color: #2d2d2d;
+            margin-bottom: 0.5rem;
+        }
+        .tagline {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+        @media (min-width: 768px) {
+            .main-content {
+                flex-direction: row;
+            }
+        }
+        .upload-section {
+            flex: 1;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            padding: 2rem;
+        }
+        .preview-section {
+            flex: 1;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            padding: 2rem;
+        }
+        .drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1.5rem;
+        }
+        .drop-area:hover, .drop-area.dragging {
+            background-color: #f9f9f9;
+            border-color: #0071e3;
+        }
+        .drop-area i {
+            font-size: 2.5rem;
+            color: #0071e3;
+            margin-bottom: 1rem;
+        }
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        button {
+            background-color: #0071e3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: 500;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #005bb5;
+        }
+        button:disabled {
+            background-color: #b0c9e4;
+            cursor: not-allowed;
+        }
+        .image-preview {
+            height: 300px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            font-size: 1.1rem;
+            overflow: hidden;
+        }
+        .image-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .preview-tabs {
+            display: flex;
+            margin-bottom: 1rem;
+        }
+        .preview-tab {
+            padding: 0.7rem 1rem;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .preview-tab.active {
+            border-bottom-color: #0071e3;
+            color: #0071e3;
+        }
+        .progress-container {
+            margin-top: 2rem;
+        }
+        .progress-bar {
+            height: 8px;
+            background-color: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #0071e3;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .status-text {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .hidden {
+            display: none;
+        }
+        .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #0071e3;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Product Image Background Generator</h1>
+            <p class="tagline">Upload your product image, remove the background, and generate a beautiful AI background</p>
+        </header>
+        
+        <div class="main-content">
+            <section class="upload-section">
+                <h2>Upload Product Image</h2>
+                <div class="drop-area" id="dropArea">
+                    <i class="fas fa-cloud-upload-alt icon"></i>
+                    <p>Drag &amp; drop your product image here<br>or click to browse</p>
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                </div>
+                
+                <div class="input-group">
+                    <label for="backgroundPrompt">Background Description:</label>
+                    <textarea id="backgroundPrompt" rows="3" placeholder="Describe the background you want (e.g., 'sleek modern kitchen with marble countertops')"></textarea>
+                </div>
+                
+                <button id="processButton" disabled>Process Image</button>
+                
+                <div class="progress-container hidden" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressBar"></div>
+                    </div>
+                    <p class="status-text" id="statusText">Processing image...</p>
+                </div>
+            </section>
+            
+            <section class="preview-section">
+                <div class="preview-tabs">
+                    <div class="preview-tab active" data-tab="original">Original</div>
+                    <div class="preview-tab" data-tab="nobg">No Background</div>
+                    <div class="preview-tab" data-tab="final">Final Result</div>
+                </div>
+                
+                <div class="image-preview" id="originalPreview">
+                    <p id="noImageText">Image preview will appear here</p>
+                    <img id="previewImage" class="hidden">
+                </div>
+                
+                <div class="image-preview hidden" id="noBgPreview">
+                    <div class="loading-spinner hidden" id="noBgSpinner"></div>
+                    <img id="noBgImage" class="hidden">
+                </div>
+                
+                <div class="image-preview hidden" id="finalPreview">
+                    <div class="loading-spinner hidden" id="finalSpinner"></div>
+                    <img id="finalImage" class="hidden">
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const processButton = document.getElementById('processButton');
+        const previewImage = document.getElementById('previewImage');
+        const noImageText = document.getElementById('noImageText');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const statusText = document.getElementById('statusText');
+        const noBgImage = document.getElementById('noBgImage');
+        const finalImage = document.getElementById('finalImage');
+        const noBgSpinner = document.getElementById('noBgSpinner');
+        const finalSpinner = document.getElementById('finalSpinner');
+        const backgroundPrompt = document.getElementById('backgroundPrompt');
+        const previewTabs = document.querySelectorAll('.preview-tab');
+        const previewSections = {
+            original: document.getElementById('originalPreview'),
+            nobg: document.getElementById('noBgPreview'),
+            final: document.getElementById('finalPreview')
+        };
+
+        // File handling
+        let selectedFile = null;
+
+        // Event listeners
+        dropArea.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', (e) => {
+            handleFileSelection(e.target.files[0]);
+        });
+
+        // Drag and drop functionality
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => {
+                dropArea.classList.add('dragging');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => {
+                dropArea.classList.remove('dragging');
+            }, false);
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            handleFileSelection(file);
+        }, false);
+
+        // Tab switching
+        previewTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Deactivate all tabs
+                previewTabs.forEach(t => t.classList.remove('active'));
+                
+                // Hide all preview sections
+                Object.values(previewSections).forEach(section => {
+                    section.classList.add('hidden');
+                });
+                
+                // Activate clicked tab
+                tab.classList.add('active');
+                
+                // Show corresponding preview section
+                const tabName = tab.getAttribute('data-tab');
+                previewSections[tabName].classList.remove('hidden');
+            });
+        });
+
+        // Process button click
+        processButton.addEventListener('click', processImage);
+
+        backgroundPrompt.addEventListener('input', validateForm);
+
+        // Functions
+        function handleFileSelection(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                alert('Please select a valid image file.');
+                return;
+            }
+
+            selectedFile = file;
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewImage.classList.remove('hidden');
+                noImageText.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+            
+            validateForm();
+        }
+
+        function validateForm() {
+            processButton.disabled = !(selectedFile && backgroundPrompt.value.trim());
+        }
+
+        function processImage() {
+            if (!selectedFile || !backgroundPrompt.value.trim()) {
+                alert('Please select an image and provide a background description.');
+                return;
+            }
+
+            // Show progress
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            statusText.textContent = 'Uploading image...';
+            
+            // Show loading spinners
+            noBgSpinner.classList.remove('hidden');
+            finalSpinner.classList.remove('hidden');
+            
+            // Mock progress animation (in a real app, this would be tied to actual processing events)
+            simulateProgress();
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('background_prompt', backgroundPrompt.value.trim());
+            
+            // Send request
+            fetch('/product_image_display', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Server error');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Show final image
+                    finalImage.src = data.url;
+                    finalImage.classList.remove('hidden');
+                    finalSpinner.classList.add('hidden');
+                    
+                    // For demo purposes, we're also showing a "no background" version
+                    // In a real app, you might get both images from the server
+                    noBgImage.src = data.url.replace('_final_output.png', '_no_bg.png');
+                    noBgImage.classList.remove('hidden');
+                    noBgSpinner.classList.add('hidden');
+                    
+                    // Update status
+                    progressBar.style.width = '100%';
+                    statusText.textContent = 'Processing complete!';
+                    
+                    // Switch to final result tab
+                    document.querySelector('.preview-tab[data-tab="final"]').click();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusText.textContent = 'Error: ' + error.message;
+                noBgSpinner.classList.add('hidden');
+                finalSpinner.classList.add('hidden');
+            });
+        }
+
+        function simulateProgress() {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress >= 90) {
+                    progress = 90;
+                    clearInterval(interval);
+                }
+                progressBar.style.width = progress + '%';
+                
+                // Update status text based on progress
+                if (progress < 30) {
+                    statusText.textContent = 'Removing background...';
+                } else if (progress < 60) {
+                    statusText.textContent = 'Generating new background...';
+                } else {
+                    statusText.textContent = 'Compositing images...';
+                }
+            }, 300);
+        }
+    </script>
+</body>
+</html>
