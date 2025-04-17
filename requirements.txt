@@ -2,7 +2,6 @@ fastapi
 uvicorn
 torch
 pillow
-briarmbg
 huggingface_hub
 diffusers
 transformers
