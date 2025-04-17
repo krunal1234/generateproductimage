@@ -7,7 +7,7 @@ import uuid
 from fastapi.staticfiles import StaticFiles
 import torch
 from PIL import Image
-from briarmbg import BriaRMBG
+from briarmbg_utils import BriaRMBG
 from huggingface_hub import hf_hub_download
 from utilities import preprocess_image, postprocess_image
 from diffusers import StableDiffusionPipeline
