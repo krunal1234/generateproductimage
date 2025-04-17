@@ -1,9 +1,9 @@
-FROM python:3.10-slim
+FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
 
 # Set workdir
 WORKDIR /app
 
-# Install system dependencies
+# Install additional system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
@@ -18,5 +18,5 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Run your FastAPI app with Uvicorn
+# Run FastAPI app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
