@@ -6,3 +6,4 @@ huggingface_hub
 diffusers
 transformers
 numpy
+opencv-python-headless
