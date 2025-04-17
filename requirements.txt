@@ -7,3 +7,4 @@ diffusers
 transformers
 numpy
 opencv-python-headless
+timm
