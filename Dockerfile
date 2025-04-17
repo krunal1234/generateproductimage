@@ -1,5 +1,4 @@
-# FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
-FROM python:3.10-slim
+FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
 
 # Set workdir
 WORKDIR /app
