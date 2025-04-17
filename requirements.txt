@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-torch
+torch==2.2.0
 pillow
 huggingface_hub
 diffusers
