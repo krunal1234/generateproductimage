@@ -7,11 +7,9 @@ import uuid
 from fastapi.staticfiles import StaticFiles
 import torch
 from PIL import Image
-from briarmbg import BriaRMBG
 from huggingface_hub import hf_hub_download
 from utilities import preprocess_image, postprocess_image
 from diffusers import StableDiffusionPipeline
-from transformers import CLIPTextModel, CLIPTokenizer
 import numpy as np
 
 app = FastAPI()
@@ -20,40 +18,25 @@ app = FastAPI()
 OUTPUT_DIR = "./output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Global variable for the background removal model
+# Global variables for models
 net = None
+stable_diffusion_pipe = None
 
-# Pre-load the BriaRMBG model on startup
+# Pre-load models on startup
 @app.on_event("startup")
 def load_model():
-    global net
-    model_path = hf_hub_download("briaai/RMBG-1.4", 'model.pth')
-    net = BriaRMBG()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net.load_state_dict(torch.load(model_path, map_location=device))
-    net.to(device)
+    global net, stable_diffusion_pipe
+
+    # Load the background removal model from Hugging Face Hub
+    model_path = hf_hub_download(repo_id="briaai/RMBG-1.4", filename='model.pth')
+    net = torch.load(model_path, map_location=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     net.eval()
 
-    # Load Stable Diffusion model from local checkpoint
-    global stable_diffusion_pipe
-    stable_diffusion_model_path = "./models/stable-diffusion-v1-4/sd-v1-4.ckpt"
-    
-    # Load Stable Diffusion model manually
-    try:
-        # Use weights_only=False to avoid the unpickling error
-        model = torch.load(stable_diffusion_model_path, map_location="cuda" if torch.cuda.is_available() else "cpu", weights_only=False)
-    except Exception as e:
-        raise ValueError(f"Failed to load the model: {e}")
-    
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14")
-    
-    # Construct the Stable Diffusion pipeline using the loaded models
+    # Load Stable Diffusion model from Hugging Face Hub
     stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
         "CompVis/stable-diffusion-v1-4",  # Hugging Face model identifier
         torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
     )
-
     stable_diffusion_pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
 # Route to serve index.html
@@ -83,7 +66,7 @@ async def product_image_display(file: UploadFile = File(...), background_prompt:
             shutil.copyfileobj(file.file, f)
 
         # Remove background from the uploaded product image
-        remove_img_bg_local(temp_input_path, temp_output_path)
+        remove_img_bg(temp_input_path, temp_output_path)
 
         # Generate a suitable background using Stable Diffusion
         product_image = Image.open(temp_output_path).convert("RGBA")
@@ -103,21 +86,17 @@ async def product_image_display(file: UploadFile = File(...), background_prompt:
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
-
-def remove_img_bg_local(input_path: str, output_path: str):
+def remove_img_bg(input_path: str, output_path: str):
     if net is None:
         raise ValueError("Background removal model not loaded")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net.to(device)  # Ensure the model is on the correct device
+    net.to(device)
 
     # Read image
-    try:
-        with Image.open(input_path) as pil_image:
-            pil_image = pil_image.convert("RGB")
-            orig_im = np.array(pil_image)
-    except Exception:
-        raise ValueError("Downloaded file is not a valid image")
+    with Image.open(input_path) as pil_image:
+        pil_image = pil_image.convert("RGB")
+        orig_im = np.array(pil_image)
 
     if orig_im is None or orig_im.size == 0:
         raise ValueError("Failed to load image for processing")
@@ -136,15 +115,11 @@ def remove_img_bg_local(input_path: str, output_path: str):
     no_bg_image.paste(orig_image, mask=mask)
     no_bg_image.save(output_path)
 
-    return output_path
-
-
 def generate_background_with_stable_diffusion(prompt: str) -> Image:
     # Generate background with Stable Diffusion
     generator = torch.manual_seed(42)  # Set seed for reproducibility
     image = stable_diffusion_pipe(prompt, guidance_scale=7.5, num_inference_steps=50).images[0]
     return image
-
 
 def combine_images(background_image: Image, product_image: Image) -> Image:
     # Resize product image to fit the background size (Optional)
@@ -153,7 +128,6 @@ def combine_images(background_image: Image, product_image: Image) -> Image:
     # Composite the images (place the product image over the background)
     background_image.paste(product_image, (0, 0), product_image)
     return background_image
-
 
 # Mount output folder
 app.mount("/output", StaticFiles(directory=OUTPUT_DIR), name="output")
