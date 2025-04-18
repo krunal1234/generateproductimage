@@ -48,7 +48,7 @@ def load_model():
         logging.info("Loading Stable Diffusion pipeline...")
         dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
-            "CompVis/stable-diffusion-v1-4",
+            "runwayml/stable-diffusion-v1-5",
             torch_dtype=dtype
         )
         stable_diffusion_pipe.to(device)
