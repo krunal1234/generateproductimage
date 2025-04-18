@@ -11,6 +11,7 @@ from huggingface_hub import hf_hub_download
 from utilities import preprocess_image, postprocess_image
 from diffusers import StableDiffusionPipeline
 import numpy as np
+from briarmbg import BriaRMBG
 
 app = FastAPI()
 
@@ -29,16 +30,22 @@ def load_model():
 
     # Load the background removal model from Hugging Face Hub
     model_path = hf_hub_download(repo_id="briaai/RMBG-1.4", filename='model.pth')
-    net = torch.load(model_path, map_location=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    
+    # Initialize the model architecture
+    net = BriaRMBG()
+    
+    # Load the model weights
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    net.load_state_dict(torch.load(model_path, map_location=device))
+    net.to(device)
     net.eval()
 
     # Load Stable Diffusion model from Hugging Face Hub
     stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
-        "CompVis/stable-diffusion-v1-4",  # Hugging Face model identifier
+        "CompVis/stable-diffusion-v1-4",
         torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
     )
-    stable_diffusion_pipe.to("cuda" if torch.cuda.is_available() else "cpu")
-
+    stable_diffusion_pipe.to(device)
 # Route to serve index.html
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
