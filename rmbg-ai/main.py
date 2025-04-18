@@ -10,7 +10,7 @@ from PIL import Image
 from briarmbg import BriaRMBG
 from huggingface_hub import hf_hub_download
 from utilities import preprocess_image, postprocess_image
-from diffusers import AutoPipelineForText2Image
+from diffusers import StableDiffusionPipeline
 import numpy as np
 
 app = FastAPI()
