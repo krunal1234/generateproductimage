@@ -7,5 +7,6 @@ transformers
 accelerate
 huggingface-hub
 pillow
+hf_xet
 numpy
 python-multipart
