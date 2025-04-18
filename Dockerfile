@@ -6,8 +6,8 @@ ENV PYTHONUNBUFFERED=1 \
     CACHE_DIR="/app/cache" \
     OUTPUT_DIR="/app/output"
 
-# Set the working directory
-WORKDIR /app
+# Set the working directory to /app/rmbg-ai (where main.py is located)
+WORKDIR /app/rmbg-ai
 
 # Install dependencies
 RUN apt-get update \
@@ -21,15 +21,15 @@ RUN apt-get update \
     && apt-get clean
 
 # Install Python dependencies
-COPY requirements.txt /app/
+COPY rmbg-ai/requirements.txt /app/rmbg-ai/
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
 # Create necessary directories (CACHE_DIR, OUTPUT_DIR)
 RUN mkdir -p /app/cache && mkdir -p /app/output
 
-# Copy the application files to the container
-COPY . /app/
+# Copy the entire rmbg-ai folder into the container
+COPY rmbg-ai /app/rmbg-ai
 
 # Expose the port the app runs on
 EXPOSE 8000
@@ -38,4 +38,4 @@ EXPOSE 8000
 RUN python -c "from briarmbg import BriaRMBG; BriaRMBG()"
 
 # Command to run the FastAPI app using Uvicorn
-CMD ["uvicorn", "rmbg-ai.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
