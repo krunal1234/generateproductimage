@@ -36,23 +36,32 @@ stable_diffusion_pipe = None
 def load_model():
     global net, stable_diffusion_pipe
 
-    print("🔄 Downloading BriaRMBG model...")
-    model_path = hf_hub_download("briaai/RMBG-1.4", 'model.pth')
+    try:
+        print("🔄 Downloading BriaRMBG model...")
+        model_path = hf_hub_download("briaai/RMBG-1.4", 'model.pth')
 
-    net = BriaRMBG()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net.load_state_dict(torch.load(model_path, map_location=device))
-    net.to(device)
-    net.eval()
-    print("✅ BriaRMBG model loaded.")
+        net = BriaRMBG()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
+        net.load_state_dict(torch.load(model_path, map_location=device))
+        net.to(device)
+        net.eval()
+        print("✅ BriaRMBG model loaded.")
+    except Exception as e:
+        print(f"❌ Failed to load BriaRMBG model: {e}")
+        raise
 
-    print("🔄 Loading Stable Diffusion pipeline from Hugging Face...")
-    stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
-        "CompVis/stable-diffusion-v1-4",
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    )
-    stable_diffusion_pipe.to(device)
-    print("✅ Stable Diffusion pipeline ready.")
+    try:
+        print("🔄 Loading Stable Diffusion pipeline from Hugging Face...")
+        stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
+            "CompVis/stable-diffusion-v1-4",
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        )
+        stable_diffusion_pipe.to(device)
+        print("✅ Stable Diffusion pipeline ready.")
+    except Exception as e:
+        print(f"❌ Failed to load Stable Diffusion pipeline: {e}")
+        raise
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
