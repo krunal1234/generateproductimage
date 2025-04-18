@@ -202,6 +202,8 @@
                 
                 <button id="processButton" disabled>Process Image</button>
                 
+                <div class="error-message" id="errorMessage"></div>
+                
                 <div class="progress-container hidden" id="progressContainer">
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressBar"></div>
@@ -250,6 +252,7 @@
         const noBgSpinner = document.getElementById('noBgSpinner');
         const finalSpinner = document.getElementById('finalSpinner');
         const backgroundPrompt = document.getElementById('backgroundPrompt');
+        const errorMessage = document.getElementById('errorMessage');
         const previewTabs = document.querySelectorAll('.preview-tab');
         const previewSections = {
             original: document.getElementById('originalPreview'),
@@ -323,7 +326,7 @@
         // Functions
         function handleFileSelection(file) {
             if (!file || !file.type.startsWith('image/')) {
-                alert('Please select a valid image file.');
+                showError('Please select a valid image file.');
                 return;
             }
 
@@ -345,12 +348,23 @@
             processButton.disabled = !(selectedFile && backgroundPrompt.value.trim());
         }
 
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
         function processImage() {
             if (!selectedFile || !backgroundPrompt.value.trim()) {
-                alert('Please select an image and provide a background description.');
+                showError('Please select an image and provide a background description.');
                 return;
             }
 
+            // Hide any previous error
+            errorMessage.style.display = 'none';
+            
             // Show progress
             progressContainer.classList.remove('hidden');
             progressBar.style.width = '0%';
@@ -366,16 +380,24 @@
             // Prepare form data
             const formData = new FormData();
             formData.append('file', selectedFile);
-            formData.append('background_prompt', backgroundPrompt.value.trim());
+            
+            // Create URL with query parameter for background prompt
+            const promptValue = encodeURIComponent(backgroundPrompt.value.trim());
+            const url = `/product_image_display?background_prompt=${promptValue}`;
             
             // Send request
-            fetch('/product_image_display', {
+            fetch(url, {
                 method: 'POST',
                 body: formData
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Server error');
+                    if (response.status === 422) {
+                        return response.json().then(data => {
+                            throw new Error('Validation error: ' + JSON.stringify(data.detail));
+                        });
+                    }
+                    throw new Error(`Server error: ${response.status}`);
                 }
                 return response.json();
             })
@@ -386,9 +408,11 @@
                     finalImage.classList.remove('hidden');
                     finalSpinner.classList.add('hidden');
                     
-                    // For demo purposes, we're also showing a "no background" version
-                    // In a real app, you might get both images from the server
-                    noBgImage.src = data.url.replace('_final_output.png', '_no_bg.png');
+                    // Extract the temp_id from the URL to construct the no_bg URL
+                    const urlParts = data.url.split('/');
+                    const filename = urlParts[urlParts.length - 1];
+                    const tempId = filename.split('_')[0];
+                    noBgImage.src = `/output/${tempId}_no_bg.png`;
                     noBgImage.classList.remove('hidden');
                     noBgSpinner.classList.add('hidden');
                     
@@ -398,13 +422,16 @@
                     
                     // Switch to final result tab
                     document.querySelector('.preview-tab[data-tab="final"]').click();
+                } else {
+                    showError('Processing failed: ' + (data.error || 'Unknown error'));
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                statusText.textContent = 'Error: ' + error.message;
+                showError(error.message);
                 noBgSpinner.classList.add('hidden');
                 finalSpinner.classList.add('hidden');
+                progressContainer.classList.add('hidden');
             });
         }
 
