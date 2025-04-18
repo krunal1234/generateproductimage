@@ -8,11 +8,10 @@ import uuid
 from fastapi.staticfiles import StaticFiles
 import torch
 from PIL import Image
-from huggingface_hub import hf_hub_download
-from utilities import preprocess_image, postprocess_image
-from diffusers import StableDiffusionPipeline
 import numpy as np
+from diffusers import StableDiffusionPipeline
 from briarmbg import BriaRMBG
+from utilities import preprocess_image, postprocess_image
 
 app = FastAPI()
 
@@ -25,27 +24,32 @@ net = None
 stable_diffusion_pipe = None
 
 # Pre-load models on startup
-
 @app.on_event("startup")
 def load_model():
     global net, stable_diffusion_pipe
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load Bria RMBG model
-    
+    try:
+        logging.info("Loading Bria RMBG model...")
+        net = BriaRMBG().to(device)
+        logging.info("Bria RMBG model loaded successfully.")
+    except Exception as e:
+        logging.error(f"Failed to load Bria RMBG model: {e}")
+
     # Load Stable Diffusion model
     try:
         logging.info("Loading Stable Diffusion pipeline...")
         dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
-            "runwayml/stable-diffusion-v1-5",
-            torch_dtype=dtype
+            "runwayml/stable-diffusion-v1-5", torch_dtype=dtype
         )
         stable_diffusion_pipe.to(device)
         logging.info("Stable Diffusion pipeline loaded successfully.")
     except Exception as e:
         logging.error(f"Failed to load Stable Diffusion pipeline: {e}")
-        
+
+
 # Route to serve index.html
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -54,15 +58,14 @@ async def serve_index():
         html_content = f.read()
     return HTMLResponse(content=html_content)
 
-# Route for product image background removal and background generation
-@app.post("/product_image_display")
-async def product_image_display(file: UploadFile = File(...), background_prompt: str = Query(...)):
+
+# Route for background removal
+@app.post("/remove_background")
+async def remove_background(file: UploadFile = File(...)):
     try:
-        # Create unique identifier for file handling
         temp_id = str(uuid.uuid4())
         temp_input_path = f"{OUTPUT_DIR}/{temp_id}_input.png"
         temp_output_path = f"{OUTPUT_DIR}/{temp_id}_no_bg.png"
-        final_output_path = f"{OUTPUT_DIR}/{temp_id}_final_output.png"
 
         # Validate uploaded file content type
         if not file.content_type.startswith("image/"):
@@ -72,20 +75,27 @@ async def product_image_display(file: UploadFile = File(...), background_prompt:
         with open(temp_input_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        # Remove background from the uploaded product image
+        # Remove background from the uploaded image
         remove_img_bg(temp_input_path, temp_output_path)
 
-        # Generate a suitable background using Stable Diffusion
-        product_image = Image.open(temp_output_path).convert("RGBA")
+        output_url = f"/output/{os.path.basename(temp_output_path)}"
+        return {"success": True, "url": output_url}
 
-        # Generate background using Stable Diffusion based on the given prompt
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# Route for generating background with Stable Diffusion
+@app.post("/generate_background")
+async def generate_background(background_prompt: str = Query(...)):
+    try:
+        # Generate background using Stable Diffusion
         background_image = generate_background_with_stable_diffusion(background_prompt)
 
-        # Combine the background with the product image
-        final_image = combine_images(background_image, product_image)
-
-        # Save final image
-        final_image.save(final_output_path)
+        # Save the generated background image
+        temp_id = str(uuid.uuid4())
+        final_output_path = f"{OUTPUT_DIR}/{temp_id}_background.png"
+        background_image.save(final_output_path)
 
         output_url = f"/output/{os.path.basename(final_output_path)}"
         return {"success": True, "url": output_url}
@@ -93,6 +103,8 @@ async def product_image_display(file: UploadFile = File(...), background_prompt:
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+
+# Background removal function
 def remove_img_bg(input_path: str, output_path: str):
     if net is None:
         raise ValueError("Background removal model not loaded")
@@ -122,22 +134,18 @@ def remove_img_bg(input_path: str, output_path: str):
     no_bg_image.paste(orig_image, mask=mask)
     no_bg_image.save(output_path)
 
+
+# Stable Diffusion background generation
 def generate_background_with_stable_diffusion(prompt: str) -> Image:
     # Generate background with Stable Diffusion
-    generator = torch.manual_seed(42)  # Set seed for reproducibility
-    image = stable_diffusion_pipe(prompt, guidance_scale=7.5, num_inference_steps=50).images[0]
+    generator = torch.Generator(device).manual_seed(42)  # Set seed for reproducibility
+    image = stable_diffusion_pipe(prompt, guidance_scale=7.5, num_inference_steps=50, generator=generator).images[0]
     return image
 
-def combine_images(background_image: Image, product_image: Image) -> Image:
-    # Resize product image to fit the background size (Optional)
-    product_image = product_image.resize(background_image.size, Image.ANTIALIAS)
-
-    # Composite the images (place the product image over the background)
-    background_image.paste(product_image, (0, 0), product_image)
-    return background_image
 
 # Mount output folder
 app.mount("/output", StaticFiles(directory=OUTPUT_DIR), name="output")
+
 
 # Run the app
 if __name__ == "__main__":
