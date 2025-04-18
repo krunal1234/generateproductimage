@@ -1,23 +1,41 @@
-# FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+# Use an official Python runtime as a parent image
 FROM python:3.9-slim
 
-# Set workdir
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    CACHE_DIR="/app/cache" \
+    OUTPUT_DIR="/app/output"
+
+# Set the working directory
 WORKDIR /app
 
-# Install additional system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Install dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libsndfile1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+    && apt-get clean
 
-# Copy and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies
+COPY requirements.txt /app/
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt
 
-# Copy application files
-COPY . .
+# Create necessary directories (CACHE_DIR, OUTPUT_DIR)
+RUN mkdir -p /app/cache && mkdir -p /app/output
 
-# Expose port
+# Copy the application files to the container
+COPY . /app/
+
+# Expose the port the app runs on
 EXPOSE 8000
 
-# Run FastAPI app
+# Ensure the model files are downloaded when starting the container
+RUN python -c "from briarmbg import BriaRMBG; BriaRMBG()"
+
+# Command to run the FastAPI app using Uvicorn
 CMD ["uvicorn", "rmbg-ai.main:app", "--host", "0.0.0.0", "--port", "8000"]
