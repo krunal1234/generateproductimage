@@ -24,28 +24,37 @@ net = None
 stable_diffusion_pipe = None
 
 # Pre-load models on startup
+
 @app.on_event("startup")
 def load_model():
     global net, stable_diffusion_pipe
-
-    # Load the background removal model from Hugging Face Hub
-    model_path = hf_hub_download(repo_id="briaai/RMBG-1.4", filename='model.pth')
-    
-    # Initialize the model architecture
-    net = BriaRMBG()
-    
-    # Load the model weights
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net.load_state_dict(torch.load(model_path, map_location=device))
-    net.to(device)
-    net.eval()
 
-    # Load Stable Diffusion model from Hugging Face Hub
-    stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
-        "CompVis/stable-diffusion-v1-4",
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
-    )
-    stable_diffusion_pipe.to(device)
+    # Load Bria RMBG model
+    try:
+        logging.info("Loading Bria RMBG model...")
+        model_path = hf_hub_download(repo_id="briaai/RMBG-1.4", filename='model.pth')
+        net = BriaRMBG()
+        net.load_state_dict(torch.load(model_path, map_location=device))
+        net.to(device)
+        net.eval()
+        logging.info("Bria RMBG model loaded successfully.")
+    except Exception as e:
+        logging.error(f"Failed to load Bria RMBG model: {e}")
+
+    # Load Stable Diffusion model
+    try:
+        logging.info("Loading Stable Diffusion pipeline...")
+        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+        stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
+            "CompVis/stable-diffusion-v1-4",
+            torch_dtype=dtype
+        )
+        stable_diffusion_pipe.to(device)
+        logging.info("Stable Diffusion pipeline loaded successfully.")
+    except Exception as e:
+        logging.error(f"Failed to load Stable Diffusion pipeline: {e}")
+        
 # Route to serve index.html
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
