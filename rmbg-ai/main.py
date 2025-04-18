@@ -54,10 +54,10 @@ def load_model():
     try:
         print("🔄 Loading Stable Diffusion pipeline from Hugging Face...")
         stable_diffusion_pipe = AutoPipelineForText2Image.from_pretrained(
-    "stabilityai/sdxl-turbo",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
-)
-stable_diffusion_pipe.to(device
+          "stabilityai/sdxl-turbo",
+          torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+        )
+        stable_diffusion_pipe.to(device)
         print("✅ Stable Diffusion pipeline ready.")
     except Exception as e:
         print(f"❌ Failed to load Stable Diffusion pipeline: {e}")
