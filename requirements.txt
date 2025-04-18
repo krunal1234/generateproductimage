@@ -8,5 +8,5 @@ accelerate
 huggingface-hub
 pillow
 hf_xet
-numpy
+numpy<2
 python-multipart
