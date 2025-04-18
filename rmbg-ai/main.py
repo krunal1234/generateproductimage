@@ -1,11 +1,11 @@
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi import FastAPI, UploadFile, File, Query
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
 import uuid
 import torch
+from fastapi import FastAPI, UploadFile, File, Query
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from briarmbg import BriaRMBG
 from huggingface_hub import hf_hub_download
@@ -13,6 +13,7 @@ from utilities import preprocess_image, postprocess_image
 from diffusers import StableDiffusionPipeline
 import numpy as np
 
+# Initialize FastAPI application
 app = FastAPI()
 
 # Setup CORS (adjust origins as needed)
@@ -24,8 +25,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Output directory
-OUTPUT_DIR = "./output"
+# Output directory (use a persistent storage solution if needed)
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./output")  # Use an environment variable to configure the output directory
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Global model variables
@@ -38,6 +39,7 @@ def load_model():
 
     try:
         print("🔄 Downloading BriaRMBG model...")
+        # Check if model exists in the cache, otherwise download
         model_path = hf_hub_download("briaai/RMBG-1.4", 'model.pth')
 
         net = BriaRMBG()
@@ -152,7 +154,7 @@ def combine_images(background_image: Image, product_image: Image) -> Image:
 # Serve static files
 app.mount("/output", StaticFiles(directory=OUTPUT_DIR), name="output")
 
-# Local run entry point
+# Local run entry point for development (comment this out for Railway deployment)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
