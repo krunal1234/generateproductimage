@@ -10,7 +10,7 @@ from PIL import Image
 from briarmbg import BriaRMBG
 from huggingface_hub import hf_hub_download
 from utilities import preprocess_image, postprocess_image
-from diffusers import StableDiffusionPipeline
+from diffusers import AutoPipelineForText2Image
 import numpy as np
 
 app = FastAPI()
@@ -53,11 +53,11 @@ def load_model():
 
     try:
         print("🔄 Loading Stable Diffusion pipeline from Hugging Face...")
-        stable_diffusion_pipe = StableDiffusionPipeline.from_pretrained(
-            "CompVis/stable-diffusion-v1-4",
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        )
-        stable_diffusion_pipe.to(device)
+        stable_diffusion_pipe = AutoPipelineForText2Image.from_pretrained(
+    "stabilityai/sdxl-turbo",
+    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+)
+stable_diffusion_pipe.to(device
         print("✅ Stable Diffusion pipeline ready.")
     except Exception as e:
         print(f"❌ Failed to load Stable Diffusion pipeline: {e}")
