@@ -393,182 +393,132 @@
                 
                 try {
                     const formData = new FormData();
-                    formData.append('file', uploadedFile);
-                    
-                    const response = await fetch('/remove_background', {
+                                        formData.append('file', uploadedFile);
+
+                    const response = await fetch('/api/remove-background', {
                         method: 'POST',
                         body: formData
                     });
-                    
+
+                    if (!response.ok) throw new Error('Failed to remove background');
+
                     const data = await response.json();
-                    
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Failed to remove background');
-                    }
-                    
-                    noBgImageUrl = data.url;
+                    noBgImageUrl = data.no_bg_url;
+
+                    originalImage.src = URL.createObjectURL(uploadedFile);
                     noBgImage.src = noBgImageUrl;
                     transparentBgImage.src = noBgImageUrl;
-                    originalImage.src = URL.createObjectURL(uploadedFile);
-                    
-                    // Enable the next button
-                    nextToGenerateBtn.disabled = false;
-                    
+
+                    document.getElementById('next-to-generate-btn').disabled = false;
+
                     hideLoading();
-                    markStepCompleted(step2);
+                    goToStep3();
                 } catch (error) {
                     hideLoading();
-                    showError('Error: ' + error.message);
+                    showError('Error removing background: ' + error.message);
                 }
             }
-            
+
             async function generateBackground() {
-                // Allow generating background even if background removal was skipped
-                if (!noBgImageUrl && !uploadedFile) {
-                    showError('Please upload an image first');
-                    return;
-                }
-                
                 const prompt = backgroundPrompt.value.trim();
                 if (!prompt) {
                     showError('Please enter a background description');
                     return;
                 }
-                
+
                 showLoading('Generating background...');
-                
+
                 try {
-                    const response = await fetch(`/generate_background?background_prompt=${encodeURIComponent(prompt)}`, {
-                        method: 'POST'
+                    const response = await fetch('/api/generate-background', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            prompt: prompt,
+                            image_url: noBgImageUrl
+                        })
                     });
-                    
+
+                    if (!response.ok) throw new Error('Failed to generate background');
+
                     const data = await response.json();
-                    
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Failed to generate background');
-                    }
-                    
-                    generatedBgUrl = data.url;
+                    generatedBgUrl = data.generated_url;
+
                     generatedBgImage.src = generatedBgUrl;
                     generatedBgContainer.style.display = 'block';
-                    
-                    // For the final image, display a composite if we have the transparent background
-                    // Or just show the generated background if user skipped background removal
-                    if (noBgImageUrl) {
-                        // In a real app, we would composite the transparent image over the background
-                        // For this demo, just show the generated background
-                        compositeImage.src = generatedBgUrl;
-                    } else {
-                        // User skipped background removal, show just the generated background
-                        compositeImage.src = generatedBgUrl;
-                    }
+
+                    compositeImage.src = generatedBgUrl;
                     finalResult.style.display = 'block';
-                    
+
                     hideLoading();
-                    markStepCompleted(step3);
                 } catch (error) {
                     hideLoading();
-                    showError('Error: ' + error.message);
+                    showError('Error generating background: ' + error.message);
                 }
             }
-            
-            function showLoading(text) {
-                loading.style.display = 'block';
-                loadingText.textContent = text || 'Processing...';
-                hideError();
-            }
-            
-            function hideLoading() {
-                loading.style.display = 'none';
-            }
-            
-            function showError(message) {
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
-            }
-            
-            function hideError() {
-                errorMessage.style.display = 'none';
-            }
-            
+
             function goToStep1() {
+                step1.classList.add('active');
+                step2.classList.remove('active');
+                step3.classList.remove('active');
+
                 step1Content.style.display = 'block';
                 step2Content.style.display = 'none';
                 step3Content.style.display = 'none';
-                
-                markStepActive(step1);
-                markStepInactive(step2);
-                markStepInactive(step3);
-                
                 finalResult.style.display = 'none';
+                errorMessage.style.display = 'none';
             }
-            
+
             function goToStep2() {
-                if (uploadedFile) {
-                    originalImage.src = URL.createObjectURL(uploadedFile);
-                    
-                    step1Content.style.display = 'none';
-                    step2Content.style.display = 'block';
-                    step3Content.style.display = 'none';
-                    
-                    markStepCompleted(step1);
-                    markStepActive(step2);
-                    markStepInactive(step3);
-                    
-                    finalResult.style.display = 'none';
-                }
+                step1.classList.remove('active');
+                step2.classList.add('active');
+                step3.classList.remove('active');
+
+                step1Content.style.display = 'none';
+                step2Content.style.display = 'block';
+                step3Content.style.display = 'none';
+                finalResult.style.display = 'none';
+                errorMessage.style.display = 'none';
             }
-            
+
             function goToStep3() {
+                step1.classList.remove('active');
+                step2.classList.remove('active');
+                step3.classList.add('active');
+
                 step1Content.style.display = 'none';
                 step2Content.style.display = 'none';
                 step3Content.style.display = 'block';
-                
-                markStepCompleted(step1);
-                markStepCompleted(step2);
-                markStepActive(step3);
+                finalResult.style.display = 'none';
+                errorMessage.style.display = 'none';
             }
-            
-            function skipBackgroundRemoval() {
-                if (uploadedFile) {
-                    // If we're skipping background removal, use the original image
-                    transparentBgImage.src = URL.createObjectURL(uploadedFile);
-                    
-                    // Mark the step as completed for UI consistency
-                    markStepCompleted(step1);
-                    markStepCompleted(step2);
-                    markStepActive(step3);
-                    
-                    // Navigate to Step 3
-                    goToStep3();
-                }
-            
-            function markStepActive(stepElement) {
-                stepElement.classList.add('active');
-                stepElement.classList.remove('completed');
+
+            function showLoading(message) {
+                loadingText.textContent = message;
+                loading.style.display = 'block';
+                errorMessage.style.display = 'none';
             }
-            
-            function markStepInactive(stepElement) {
-                stepElement.classList.remove('active');
-                stepElement.classList.remove('completed');
+
+            function hideLoading() {
+                loading.style.display = 'none';
             }
-            
-            function markStepCompleted(stepElement) {
-                stepElement.classList.remove('active');
-                stepElement.classList.add('completed');
+
+            function showError(msg) {
+                errorMessage.textContent = msg;
+                errorMessage.style.display = 'block';
             }
-            
+
             function downloadResult() {
-                // In a real app, we'd create a composite image on the server
-                // For this demo, we just download the background image
-                if (generatedBgUrl) {
-                    const a = document.createElement('a');
-                    a.href = generatedBgUrl;
-                    a.download = 'background.png';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                }
+                const link = document.createElement('a');
+                link.href = compositeImage.src;
+                link.download = 'final_result.png';
+                link.click();
+            }
+
+            function skipBackgroundRemoval() {
+                goToStep3();
+                transparentBgImage.src = URL.createObjectURL(uploadedFile);
             }
         });
     </script>
