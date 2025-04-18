@@ -32,17 +32,7 @@ def load_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load Bria RMBG model
-    try:
-        logging.info("Loading Bria RMBG model...")
-        model_path = hf_hub_download(repo_id="briaai/RMBG-1.4", filename='model.pth')
-        net = BriaRMBG()
-        net.load_state_dict(torch.load(model_path, map_location=device))
-        net.to(device)
-        net.eval()
-        logging.info("Bria RMBG model loaded successfully.")
-    except Exception as e:
-        logging.error(f"Failed to load Bria RMBG model: {e}")
-
+    
     # Load Stable Diffusion model
     try:
         logging.info("Loading Stable Diffusion pipeline...")
