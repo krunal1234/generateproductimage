@@ -1,11 +1,11 @@
 fastapi
 uvicorn
 pillow
-torch==2.2.0
-torchvision==0.17.0
+torch
+torchvision
 huggingface_hub
-diffusers>=0.22.0
-transformers>=4.34.0
+diffusers
+transformers
 numpy
 opencv-python-headless
 timm
