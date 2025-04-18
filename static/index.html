@@ -295,7 +295,7 @@
             const backgroundPrompt = document.getElementById('background-prompt');
             const removeBgBtn = document.getElementById('remove-bg-btn');
             const generateBgBtn = document.getElementById('generate-bg-btn');
-            const nextToGenerateBtn = document.getElementById('next-to-generate-btn');
+            const skipBgRemovalBtn = document.getElementById('skip-bg-removal-btn');
             const backToUploadBtn = document.getElementById('back-to-upload-btn');
             const backToRemoveBtn = document.getElementById('back-to-remove-btn');
             const loading = document.getElementById('loading');
@@ -333,7 +333,7 @@
             
             backToUploadBtn.addEventListener('click', goToStep1);
             backToRemoveBtn.addEventListener('click', goToStep2);
-            nextToGenerateBtn.addEventListener('click', goToStep3);
+            skipBgRemovalBtn.addEventListener('click', skipBackgroundRemoval);
             
             downloadBtn.addEventListener('click', downloadResult);
             
@@ -423,8 +423,9 @@
             }
             
             async function generateBackground() {
-                if (!noBgImageUrl) {
-                    showError('Please remove the background first');
+                // Allow generating background even if background removal was skipped
+                if (!noBgImageUrl && !uploadedFile) {
+                    showError('Please upload an image first');
                     return;
                 }
                 
@@ -451,9 +452,16 @@
                     generatedBgImage.src = generatedBgUrl;
                     generatedBgContainer.style.display = 'block';
                     
-                    // Show composite image (this would require additional backend processing in a real app)
-                    // For demo purposes, just show the generated background
-                    compositeImage.src = generatedBgUrl;
+                    // For the final image, display a composite if we have the transparent background
+                    // Or just show the generated background if user skipped background removal
+                    if (noBgImageUrl) {
+                        // In a real app, we would composite the transparent image over the background
+                        // For this demo, just show the generated background
+                        compositeImage.src = generatedBgUrl;
+                    } else {
+                        // User skipped background removal, show just the generated background
+                        compositeImage.src = generatedBgUrl;
+                    }
                     finalResult.style.display = 'block';
                     
                     hideLoading();
@@ -512,16 +520,28 @@
             }
             
             function goToStep3() {
-                if (noBgImageUrl) {
-                    step1Content.style.display = 'none';
-                    step2Content.style.display = 'none';
-                    step3Content.style.display = 'block';
+                step1Content.style.display = 'none';
+                step2Content.style.display = 'none';
+                step3Content.style.display = 'block';
+                
+                markStepCompleted(step1);
+                markStepCompleted(step2);
+                markStepActive(step3);
+            }
+            
+            function skipBackgroundRemoval() {
+                if (uploadedFile) {
+                    // If we're skipping background removal, use the original image
+                    transparentBgImage.src = URL.createObjectURL(uploadedFile);
                     
+                    // Mark the step as completed for UI consistency
                     markStepCompleted(step1);
                     markStepCompleted(step2);
                     markStepActive(step3);
+                    
+                    // Navigate to Step 3
+                    goToStep3();
                 }
-            }
             
             function markStepActive(stepElement) {
                 stepElement.classList.add('active');
