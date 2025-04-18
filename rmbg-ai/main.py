@@ -1,3 +1,4 @@
+import logging
 from fastapi.responses import HTMLResponse
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
