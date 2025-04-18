@@ -270,59 +270,6 @@
             handleFileSelection(e.target.files[0]);
         });
 
-        // Drag and drop functionality
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, preventDefaults, false);
-        });
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => {
-                dropArea.classList.add('dragging');
-            }, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => {
-                dropArea.classList.remove('dragging');
-            }, false);
-        });
-
-        dropArea.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            const file = dt.files[0];
-            handleFileSelection(file);
-        }, false);
-
-        // Tab switching
-        previewTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Deactivate all tabs
-                previewTabs.forEach(t => t.classList.remove('active'));
-                
-                // Hide all preview sections
-                Object.values(previewSections).forEach(section => {
-                    section.classList.add('hidden');
-                });
-                
-                // Activate clicked tab
-                tab.classList.add('active');
-                
-                // Show corresponding preview section
-                const tabName = tab.getAttribute('data-tab');
-                previewSections[tabName].classList.remove('hidden');
-            });
-        });
-
-        // Process button click
-        processButton.addEventListener('click', processImage);
-
-        backgroundPrompt.addEventListener('input', validateForm);
-
         // Functions
         function handleFileSelection(file) {
             if (!file || !file.type.startsWith('image/')) {
@@ -370,90 +317,51 @@
             progressBar.style.width = '0%';
             statusText.textContent = 'Uploading image...';
             
-            // Show loading spinners
-            noBgSpinner.classList.remove('hidden');
-            finalSpinner.classList.remove('hidden');
-            
-            // Mock progress animation (in a real app, this would be tied to actual processing events)
-            simulateProgress();
-            
             // Prepare form data
             const formData = new FormData();
             formData.append('file', selectedFile);
             
-            // Create URL with query parameter for background prompt
-            const promptValue = encodeURIComponent(backgroundPrompt.value.trim());
-            const url = `/product_image_display?background_prompt=${promptValue}`;
-            
-            // Send request
-            fetch(url, {
+            // Background removal API call
+            fetch('/remove_background', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => {
-                if (!response.ok) {
-                    if (response.status === 422) {
-                        return response.json().then(data => {
-                            throw new Error('Validation error: ' + JSON.stringify(data.detail));
-                        });
-                    }
-                    throw new Error(`Server error: ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Show final image
-                    finalImage.src = data.url;
-                    finalImage.classList.remove('hidden');
-                    finalSpinner.classList.add('hidden');
-                    
-                    // Extract the temp_id from the URL to construct the no_bg URL
-                    const urlParts = data.url.split('/');
-                    const filename = urlParts[urlParts.length - 1];
-                    const tempId = filename.split('_')[0];
-                    noBgImage.src = `/output/${tempId}_no_bg.png`;
+                    noBgImage.src = data.url;
                     noBgImage.classList.remove('hidden');
                     noBgSpinner.classList.add('hidden');
-                    
-                    // Update status
-                    progressBar.style.width = '100%';
-                    statusText.textContent = 'Processing complete!';
-                    
-                    // Switch to final result tab
-                    document.querySelector('.preview-tab[data-tab="final"]').click();
+                    progressBar.style.width = '50%';
+                    statusText.textContent = 'Background removed, generating new background...';
+                    generateBackground();
                 } else {
-                    showError('Processing failed: ' + (data.error || 'Unknown error'));
+                    showError('Failed to remove background.');
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                showError(error.message);
-                noBgSpinner.classList.add('hidden');
-                finalSpinner.classList.add('hidden');
-                progressContainer.classList.add('hidden');
+                showError('Failed to upload image.');
             });
         }
 
-        function simulateProgress() {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 10;
-                if (progress >= 90) {
-                    progress = 90;
-                    clearInterval(interval);
-                }
-                progressBar.style.width = progress + '%';
-                
-                // Update status text based on progress
-                if (progress < 30) {
-                    statusText.textContent = 'Removing background...';
-                } else if (progress < 60) {
-                    statusText.textContent = 'Generating new background...';
+        function generateBackground() {
+            const prompt = encodeURIComponent(backgroundPrompt.value.trim());
+            fetch(`/generate_background?background_prompt=${prompt}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    finalImage.src = data.url;
+                    finalImage.classList.remove('hidden');
+                    finalSpinner.classList.add('hidden');
+                    progressBar.style.width = '100%';
+                    statusText.textContent = 'Background generation complete!';
                 } else {
-                    statusText.textContent = 'Compositing images...';
+                    showError('Failed to generate background.');
                 }
-            }, 300);
+            })
+            .catch(error => {
+                showError('Error generating background.');
+            });
         }
     </script>
 </body>
