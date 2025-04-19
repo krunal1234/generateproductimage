@@ -51,24 +51,17 @@ async def serve_index():
     return HTMLResponse(content=html_content)
 
 # Image processing endpoint
-@app.post("/product_image_display")
-async def product_image_display(
-    file: UploadFile = File(...),
+@app.post("/generate_product_image")
+async def generate_product_image(
+    image_id: str = Form(...),
     background_prompt: str = Form(...)
 ):
     try:
-        temp_id = str(uuid.uuid4())
-        temp_input_path = f"{OUTPUT_DIR}/{temp_id}_input.png"
-        temp_output_path = f"{OUTPUT_DIR}/{temp_id}_no_bg.png"
-        final_output_path = f"{OUTPUT_DIR}/{temp_id}_final_output.png"
+        temp_output_path = f"{OUTPUT_DIR}/{image_id}_no_bg.png"
+        final_output_path = f"{OUTPUT_DIR}/{image_id}_final_output.png"
 
-        if not file.content_type.startswith("image/"):
-            return JSONResponse(content={"error": "Uploaded file is not an image"}, status_code=400)
-
-        with open(temp_input_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
-
-        remove_img_bg_local(temp_input_path, temp_output_path)
+        if not os.path.exists(temp_output_path):
+            return JSONResponse(content={"error": "No background-removed image found for given ID"}, status_code=404)
 
         product_image = Image.open(temp_output_path).convert("RGBA")
         background_image = generate_background_with_stable_diffusion(background_prompt)
@@ -77,17 +70,40 @@ async def product_image_display(
         final_image.save(final_output_path)
 
         output_url = f"/output/{os.path.basename(final_output_path)}"
-        no_bg_url = f"/output/{os.path.basename(temp_output_path)}"
 
         return {
             "success": True,
-            "url": output_url,
-            "no_bg_url": no_bg_url
+            "url": output_url
         }
 
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+    
+@app.post("/remove_background")
+async def remove_background(file: UploadFile = File(...)):
+    try:
+        if not file.content_type.startswith("image/"):
+            return JSONResponse(content={"error": "Uploaded file is not an image"}, status_code=400)
 
+        temp_id = str(uuid.uuid4())
+        temp_input_path = f"{OUTPUT_DIR}/{temp_id}_input.png"
+        temp_output_path = f"{OUTPUT_DIR}/{temp_id}_no_bg.png"
+
+        with open(temp_input_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        remove_img_bg_local(temp_input_path, temp_output_path)
+
+        no_bg_url = f"/output/{os.path.basename(temp_output_path)}"
+
+        return {
+            "success": True,
+            "no_bg_url": no_bg_url,
+            "image_id": temp_id  # Optional, used for next step
+        }
+
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 # Helper functions
 def remove_img_bg_local(input_path: str, output_path: str):
