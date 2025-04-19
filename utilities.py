@@ -2,6 +2,7 @@ import torch
 import torchvision.transforms as transforms
 import numpy as np
 from PIL import Image
+import torch.nn.functional as F
 
 def preprocess_image(image: np.ndarray, target_size=(1024, 1024)):
     transform = transforms.Compose([
@@ -12,8 +13,14 @@ def preprocess_image(image: np.ndarray, target_size=(1024, 1024)):
     tensor = transform(image).unsqueeze(0)  # Add batch dimension
     return tensor
 
-def postprocess_image(mask: torch.Tensor, original_size):
-    mask = transforms.Resize(original_size)(mask.unsqueeze(0))
-    mask = mask.squeeze().cpu().detach().numpy()
-    mask = (mask * 255).astype(np.uint8)
+def postprocess_image(prediction, orig_shape):
+    # Ensure input is 4D (N, C, H, W)
+    if prediction.dim() == 2:
+        prediction = prediction.unsqueeze(0).unsqueeze(0)
+    elif prediction.dim() == 3:
+        prediction = prediction.unsqueeze(0)
+    
+    resized = F.interpolate(prediction, size=orig_shape, mode='bilinear', align_corners=False)
+    mask = resized.squeeze().cpu().detach().numpy() * 255
+    mask = np.clip(mask, 0, 255).astype(np.uint8)
     return mask
