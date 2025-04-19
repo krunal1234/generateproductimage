@@ -105,35 +105,47 @@ async def generate_background(background_prompt: str = Query(...)):
 
 
 # Background removal function
-def remove_img_bg(input_path: str, output_path: str):
-    if net is None:
-        raise ValueError("Background removal model not loaded")
+def remove_img_bg(input_img: str, img_type="jpg", out_img_suffix="_no_bg.png"):
+    model_path = hf_hub_download("briaai/RMBG-1.4", 'model.pth')
+    print("ai model model_path ==> ", model_path)
+    # 传入的绝对路径
+    abs_file = input_img.startswith("/") or input_img.find(":") > 0
+    if abs_file:
+        im_path = f"{input_img}.{img_type}"
+    else:
+        im_path = f"{os.path.dirname(os.path.abspath(__file__))}/resource/{input_img}.{img_type}"
 
+    net = BriaRMBG()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    net.load_state_dict(torch.load(model_path, map_location=device))
     net.to(device)
+    net.eval()
 
-    # Read image
-    with Image.open(input_path) as pil_image:
-        pil_image = pil_image.convert("RGB")
-        orig_im = np.array(pil_image)
-
-    if orig_im is None or orig_im.size == 0:
-        raise ValueError("Failed to load image for processing")
-
-    # Prepare input and move to the correct device
+    # prepare input
     model_input_size = [1024, 1024]
+    orig_im = io.imread(im_path)
+    orig_im_size = orig_im.shape[0:2]
     image = preprocess_image(orig_im, model_input_size).to(device)
+
+    # inference 
     result = net(image)
 
-    # Post-process and remove background
-    result_image = postprocess_image(result[0][0], orig_im.shape[0:2])
-    mask = Image.fromarray(result_image).convert("L")
-    orig_image = Image.open(input_path).convert("RGBA")
-    no_bg_image = Image.new("RGBA", orig_image.size, (0, 0, 0, 0))
-    no_bg_image.paste(orig_image, (0, 0), mask=mask)
-    no_bg_image.save(output_path)
+    # post process
+    result_image = postprocess_image(result[0][0], orig_im_size)
 
-
+    # save result
+    pil_im = Image.fromarray(result_image)
+    no_bg_image = Image.new("RGBA", pil_im.size, (0, 0, 0, 0))
+    orig_image = Image.open(im_path)
+    no_bg_image.paste(orig_image, mask=pil_im)
+    if abs_file:
+        save_file_name = f"{input_img}{out_img_suffix}"
+    else:
+        save_file_name = f"{os.path.dirname(os.path.abspath(__file__))}/resource/{input_img}{out_img_suffix}"
+    no_bg_image.save(save_file_name)
+    return save_file_name
+    
+    
 # Stable Diffusion background generation
 def generate_background_with_stable_diffusion(prompt: str) -> Image:
     if stable_diffusion_pipe is None:
