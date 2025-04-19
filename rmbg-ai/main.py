@@ -129,9 +129,8 @@ def remove_img_bg(input_path: str, output_path: str):
     result_image = postprocess_image(result[0][0], orig_im.shape[0:2])
     mask = Image.fromarray(result_image).convert("L")
     orig_image = Image.open(input_path).convert("RGBA")
-
-    no_bg_image = Image.new("RGBA", mask.size, (0, 0, 0, 0))
-    no_bg_image.paste(orig_image, mask=mask)
+    no_bg_image = Image.new("RGBA", orig_image.size, (0, 0, 0, 0))
+    no_bg_image.paste(orig_image, (0, 0), mask=mask)
     no_bg_image.save(output_path)
 
 
