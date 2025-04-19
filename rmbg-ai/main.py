@@ -137,11 +137,20 @@ def remove_img_bg(input_path: str, output_path: str):
 
 # Stable Diffusion background generation
 def generate_background_with_stable_diffusion(prompt: str) -> Image:
-    # Generate background with Stable Diffusion
-    generator = torch.Generator(device).manual_seed(42)  # Set seed for reproducibility
-    image = stable_diffusion_pipe(prompt, guidance_scale=7.5, num_inference_steps=50, generator=generator).images[0]
-    return image
+    if stable_diffusion_pipe is None:
+        raise ValueError("Stable Diffusion pipeline not loaded")
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # <-- Add this
+    generator = torch.Generator(device=device).manual_seed(42)
+    
+    image = stable_diffusion_pipe(
+        prompt,
+        guidance_scale=7.5,
+        num_inference_steps=50,
+        generator=generator
+    ).images[0]
+
+    return image
 
 # Mount output folder
 app.mount("/output", StaticFiles(directory=OUTPUT_DIR), name="output")
