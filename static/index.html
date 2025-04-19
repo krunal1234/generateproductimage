@@ -200,7 +200,8 @@
                     <textarea id="backgroundPrompt" rows="3" placeholder="Describe the background you want (e.g., 'sleek modern kitchen with marble countertops')"></textarea>
                 </div>
                 
-                <button id="processButton" disabled>Process Image</button>
+                <button id="removeBgButton" disabled>Remove Background</button>
+                <button id="generateImageButton" style="margin-top: 20px;" disabled>Generate Final Image</button>
                 
                 <div class="progress-container hidden" id="progressContainer">
                     <div class="progress-bar">
@@ -239,7 +240,8 @@
         // DOM Elements
         const dropArea = document.getElementById('dropArea');
         const fileInput = document.getElementById('fileInput');
-        const processButton = document.getElementById('processButton');
+        const removeBgButton = document.getElementById('removeBgButton');
+        const generateImageButton = document.getElementById('generateImageButton');
         const previewImage = document.getElementById('previewImage');
         const noImageText = document.getElementById('noImageText');
         const progressContainer = document.getElementById('progressContainer');
@@ -256,80 +258,60 @@
             nobg: document.getElementById('noBgPreview'),
             final: document.getElementById('finalPreview')
         };
-
+    
         // File handling
         let selectedFile = null;
-
-        // Event listeners
+        let imageId = null;
+    
+        // Event Listeners
         dropArea.addEventListener('click', () => fileInput.click());
-        
-        fileInput.addEventListener('change', (e) => {
-            handleFileSelection(e.target.files[0]);
-        });
-
-        // Drag and drop functionality
+        fileInput.addEventListener('change', (e) => handleFileSelection(e.target.files[0]));
+        backgroundPrompt.addEventListener('input', validateForm);
+        removeBgButton.addEventListener('click', removeBackground);
+        generateImageButton.addEventListener('click', generateFinalImage);
+    
+        // Drag-and-drop
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropArea.addEventListener(eventName, preventDefaults, false);
         });
-
+    
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('dragging'), false);
+        });
+    
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragging'), false);
+        });
+    
+        dropArea.addEventListener('drop', (e) => {
+            const file = e.dataTransfer.files[0];
+            handleFileSelection(file);
+        });
+    
+        previewTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                previewTabs.forEach(t => t.classList.remove('active'));
+                Object.values(previewSections).forEach(section => section.classList.add('hidden'));
+                tab.classList.add('active');
+                previewSections[tab.getAttribute('data-tab')].classList.remove('hidden');
+            });
+        });
+    
         function preventDefaults(e) {
             e.preventDefault();
             e.stopPropagation();
         }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => {
-                dropArea.classList.add('dragging');
-            }, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => {
-                dropArea.classList.remove('dragging');
-            }, false);
-        });
-
-        dropArea.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            const file = dt.files[0];
-            handleFileSelection(file);
-        }, false);
-
-        // Tab switching
-        previewTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Deactivate all tabs
-                previewTabs.forEach(t => t.classList.remove('active'));
-                
-                // Hide all preview sections
-                Object.values(previewSections).forEach(section => {
-                    section.classList.add('hidden');
-                });
-                
-                // Activate clicked tab
-                tab.classList.add('active');
-                
-                // Show corresponding preview section
-                const tabName = tab.getAttribute('data-tab');
-                previewSections[tabName].classList.remove('hidden');
-            });
-        });
-
-        // Process button click
-        processButton.addEventListener('click', processImage);
-
-        backgroundPrompt.addEventListener('input', validateForm);
-
-        // Functions
+    
         function handleFileSelection(file) {
             if (!file || !file.type.startsWith('image/')) {
                 alert('Please select a valid image file.');
                 return;
             }
-
             selectedFile = file;
-            
-            // Show preview
+            imageId = null;
+            finalImage.src = '';
+            noBgImage.src = '';
+    
             const reader = new FileReader();
             reader.onload = (e) => {
                 previewImage.src = e.target.result;
@@ -337,96 +319,87 @@
                 noImageText.classList.add('hidden');
             };
             reader.readAsDataURL(file);
-            
             validateForm();
         }
-
+    
         function validateForm() {
-            processButton.disabled = !(selectedFile && backgroundPrompt.value.trim());
+            removeBgButton.disabled = !selectedFile;
+            generateImageButton.disabled = !(imageId && backgroundPrompt.value.trim());
         }
-
-        function processImage() {
-            if (!selectedFile || !backgroundPrompt.value.trim()) {
-                alert('Please select an image and provide a background description.');
-                return;
-            }
-
-            // Show progress
+    
+        function removeBackground() {
+            if (!selectedFile) return;
+    
             progressContainer.classList.remove('hidden');
             progressBar.style.width = '0%';
-            statusText.textContent = 'Uploading image...';
-            
-            // Show loading spinners
+            statusText.textContent = 'Removing background...';
             noBgSpinner.classList.remove('hidden');
-            finalSpinner.classList.remove('hidden');
-            
-            // Mock progress animation (in a real app, this would be tied to actual processing events)
-            simulateProgress();
-            
-            // Prepare form data
+    
             const formData = new FormData();
             formData.append('file', selectedFile);
-            formData.append('background_prompt', backgroundPrompt.value.trim());
-            
-            // Send request
-            fetch('/product_image_display', {
+    
+            fetch('/remove_background', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Server error');
-                }
-                return response.json();
-            })
+            .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    // Show final image
+                    imageId = data.image_id;
+                    noBgImage.src = data.no_bg_url;
+                    noBgImage.classList.remove('hidden');
+                    noBgSpinner.classList.add('hidden');
+                    document.querySelector('.preview-tab[data-tab="nobg"]').click();
+    
+                    progressBar.style.width = '50%';
+                    statusText.textContent = 'Background removed. Ready to generate final image.';
+    
+                    validateForm(); // Re-enable "Generate" button if prompt is ready
+                } else {
+                    throw new Error(data.error || 'Background removal failed');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                statusText.textContent = 'Error: ' + err.message;
+                noBgSpinner.classList.add('hidden');
+            });
+        }
+    
+        function generateFinalImage() {
+            if (!imageId || !backgroundPrompt.value.trim()) return;
+    
+            progressBar.style.width = '50%';
+            statusText.textContent = 'Generating AI background...';
+            finalSpinner.classList.remove('hidden');
+    
+            const formData = new FormData();
+            formData.append('image_id', imageId);
+            formData.append('background_prompt', backgroundPrompt.value.trim());
+    
+            fetch('/generate_product_image', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
                     finalImage.src = data.url;
                     finalImage.classList.remove('hidden');
                     finalSpinner.classList.add('hidden');
-                    
-                    // For demo purposes, we're also showing a "no background" version
-                    // In a real app, you might get both images from the server
-                    noBgImage.src = data.url.replace('_final_output.png', '_no_bg.png');
-                    noBgImage.classList.remove('hidden');
-                    noBgSpinner.classList.add('hidden');
-                    
-                    // Update status
+    
                     progressBar.style.width = '100%';
-                    statusText.textContent = 'Processing complete!';
-                    
-                    // Switch to final result tab
+                    statusText.textContent = 'Final image generated!';
                     document.querySelector('.preview-tab[data-tab="final"]').click();
+                } else {
+                    throw new Error(data.error || 'Image generation failed');
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                statusText.textContent = 'Error: ' + error.message;
-                noBgSpinner.classList.add('hidden');
+            .catch(err => {
+                console.error(err);
+                statusText.textContent = 'Error: ' + err.message;
                 finalSpinner.classList.add('hidden');
             });
-        }
-
-        function simulateProgress() {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 10;
-                if (progress >= 90) {
-                    progress = 90;
-                    clearInterval(interval);
-                }
-                progressBar.style.width = progress + '%';
-                
-                // Update status text based on progress
-                if (progress < 30) {
-                    statusText.textContent = 'Removing background...';
-                } else if (progress < 60) {
-                    statusText.textContent = 'Generating new background...';
-                } else {
-                    statusText.textContent = 'Compositing images...';
-                }
-            }, 300);
         }
     </script>
 </body>
