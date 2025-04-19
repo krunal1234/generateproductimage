@@ -3,247 +3,585 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Background Management</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.12.0/cdn.min.js"></script>
+    <title>Background Magic - Remove & Generate</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <style>
-        .app-container {
-            max-width: 1200px;
-            margin: 0 auto;
+        .loader {
+            border-top-color: #4f46e5;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
         }
-        .preview-container {
-            height: 400px;
-            overflow: hidden;
-            position: relative;
-            background-color: #f0f0f0;
-            background-image: linear-gradient(45deg, #ccc 25%, transparent 25%),
-                              linear-gradient(-45deg, #ccc 25%, transparent 25%),
-                              linear-gradient(45deg, transparent 75%, #ccc 75%),
-                              linear-gradient(-45deg, transparent 75%, #ccc 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
         }
-        .preview-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border-left-color: #3b82f6;
-            animation: spin 1s linear infinite;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            margin-top: -18px;
-            margin-left: -18px;
-            display: none;
-        }
-        @keyframes spin {
+        @keyframes spinner {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .loading .spinner {
-            display: block;
+        .dropzone {
+            border: 2px dashed #e2e8f0;
+            transition: all 0.3s ease;
         }
-        .loading img {
-            opacity: 0.5;
+        .dropzone:hover, .dropzone.active {
+            border-color: #4f46e5;
+            background-color: #f9fafb;
+        }
+        .image-preview {
+            max-height: 400px;
+            object-fit: contain;
+        }
+        .step-number {
+            width: 36px;
+            height: 36px;
+        }
+        .step-active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .step-complete {
+            background-color: #10b981;
+            color: white;
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen" x-data="imageProcessor()">
-    <div class="app-container py-8 px-4">
-        <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-blue-700">Image Background Management</h1>
-            <p class="text-gray-600 mt-2">Upload an image, remove its background, or generate a new background</p>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <header class="mb-10 text-center">
+            <h1 class="text-4xl font-bold text-indigo-600 mb-2">Background Magic</h1>
+            <p class="text-lg text-gray-600">Remove backgrounds from images and generate new creative backgrounds</p>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <!-- Left column: Upload and controls -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="file-upload">
-                        Upload Image
-                    </label>
-                    <input
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        id="file-upload"
-                        type="file"
-                        accept="image/*"
-                        @change="handleFileUpload"
-                    >
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <!-- Step Indicator -->
+            <div class="flex justify-center mb-8">
+                <div class="flex items-center">
+                    <div class="flex items-center justify-center step-number step-active rounded-full font-bold">1</div>
+                    <div class="mx-2 text-gray-500">Upload</div>
+                    <div class="w-12 h-1 bg-gray-300" id="line-1"></div>
+                    <div class="flex items-center justify-center step-number rounded-full bg-gray-300 font-bold mx-2" id="step-2">2</div>
+                    <div class="mx-2 text-gray-500">Remove Background</div>
+                    <div class="w-12 h-1 bg-gray-300" id="line-2"></div>
+                    <div class="flex items-center justify-center step-number rounded-full bg-gray-300 font-bold" id="step-3">3</div>
+                    <div class="mx-2 text-gray-500">Generate Background</div>
                 </div>
+            </div>
 
-                <div class="mb-6" x-show="uploadedImage">
-                    <button
-                        class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md mb-4 transition duration-300"
-                        @click="removeBackground"
-                        :disabled="isProcessing"
-                        :class="{'opacity-50 cursor-not-allowed': isProcessing}"
-                    >
-                        Remove Background
-                    </button>
+            <!-- Step 1: Upload -->
+            <div id="upload-section" class="mb-8">
+                <div id="dropzone" class="dropzone rounded-lg p-12 text-center cursor-pointer">
+                    <input type="file" id="fileInput" class="hidden" accept="image/*" />
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M24 8l3.59 3.59L31 8l-7-7-7 7 3.41 3.59L24 8zM8 24l3.59-3.59L8 17l-7 7 7 7 3.41-3.59L8 24zM24 40l-3.59-3.59L17 40l7 7 7-7-3.41-3.59L24 40zM40 24l-3.59 3.59L40 31l7-7-7-7-3.41 3.59L40 24z"></path>
+                    </svg>
+                    <p class="mt-2 text-sm text-gray-600">Drag and drop your image here, or click to select</p>
+                    <p class="text-xs text-gray-500 mt-1">Supports PNG, JPG, JPEG</p>
                 </div>
+            </div>
 
-                <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="background-prompt">
-                        Background Prompt
-                    </label>
-                    <textarea
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        id="background-prompt"
-                        rows="3"
-                        placeholder="Describe the background you want to generate..."
-                        x-model="backgroundPrompt"
-                    ></textarea>
+            <!-- Step 2: Remove Background -->
+            <div id="remove-bg-section" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900 mb-3">Original Image</h3>
+                        <div class="bg-gray-100 rounded-lg p-2 flex justify-center">
+                            <img id="original-image" class="image-preview rounded" src="" alt="Original image" />
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900 mb-3">
+                            <span>Removed Background</span>
+                            <span id="bg-remove-loader" class="hidden ml-2 inline-block">
+                                <div class="loader ease-linear rounded-full border-2 border-t-2 border-gray-200 h-5 w-5"></div>
+                            </span>
+                        </h3>
+                        <div class="bg-gray-100 rounded-lg p-2 flex justify-center" id="no-bg-container">
+                            <div id="no-bg-placeholder" class="flex items-center justify-center h-64 w-full">
+                                <button id="remove-bg-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-6 rounded-lg shadow-md transition duration-200">
+                                    Remove Background
+                                </button>
+                            </div>
+                            <img id="no-bg-image" class="hidden image-preview rounded" src="" alt="Image with removed background" />
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                <div class="mb-6">
-                    <button
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition duration-300"
-                        @click="generateBackground"
-                        :disabled="!backgroundPrompt || isProcessing"
-                        :class="{'opacity-50 cursor-not-allowed': !backgroundPrompt || isProcessing}"
-                    >
-                        Generate Background
-                    </button>
+            <!-- Step 3: Generate Background -->
+            <div id="generate-bg-section" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900 mb-3">Image without Background</h3>
+                        <div class="bg-gray-100 rounded-lg p-2 flex justify-center">
+                            <img id="transparent-image" class="image-preview rounded" src="" alt="Transparent background image" />
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900 mb-3">Generate New Background</h3>
+                        <div class="mb-4">
+                            <label for="bg-prompt" class="block text-sm font-medium text-gray-700 mb-1">Background Description</label>
+                            <div class="flex">
+                                <input type="text" id="bg-prompt" class="flex-grow rounded-l-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="E.g., a beach at sunset, a magical forest, galaxy in space..." />
+                                <button id="generate-bg-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-r-lg shadow-sm transition duration-200">
+                                    Generate
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Be descriptive for better results</p>
+                        </div>
+                        <div class="bg-gray-100 rounded-lg p-2 flex justify-center" id="generated-bg-container">
+                            <div id="generated-bg-placeholder" class="flex items-center justify-center h-64 w-full">
+                                <span class="text-gray-500 text-sm">Generated background will appear here</span>
+                            </div>
+                            <img id="generated-bg-image" class="hidden image-preview rounded" src="" alt="Generated background" />
+                            <div id="bg-generate-loader" class="hidden flex items-center justify-center h-64 w-full">
+                                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                <div class="mb-6" x-show="processedImageUrl">
-                    <button
-                        class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-md transition duration-300"
-                        @click="downloadImage"
-                    >
-                        Download Image
+            <!-- Final Composite (Step 4) -->
+            <div id="composite-section" class="hidden mt-8">
+                <h3 class="text-lg font-medium text-gray-900 mb-3">Final Result</h3>
+                <div class="bg-gray-100 rounded-lg p-2 flex justify-center">
+                    <div id="composite-placeholder" class="flex items-center justify-center h-64 w-full">
+                        <button id="create-composite-btn" class="bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded-lg shadow-md transition duration-200">
+                            Create Composite Image
+                        </button>
+                    </div>
+                    <div id="composite-result" class="hidden w-full flex justify-center">
+                        <canvas id="composite-canvas" class="image-preview rounded"></canvas>
+                    </div>
+                </div>
+                <div class="flex justify-center mt-4">
+                    <button id="download-btn" class="hidden bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded-lg shadow-md transition duration-200">
+                        Download Result
                     </button>
                 </div>
             </div>
 
-            <!-- Right column: Preview -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">Preview</h2>
-                <div class="preview-container rounded-lg" :class="{'loading': isProcessing}">
-                    <div class="spinner"></div>
-                    <img 
-                        x-show="previewImage" 
-                        :src="previewImage" 
-                        alt="Preview"
-                    >
-                    <div 
-                        x-show="!previewImage" 
-                        class="flex items-center justify-center h-full text-gray-500"
-                    >
-                        Upload an image or generate a background to see preview
-                    </div>
-                </div>
-                <div class="mt-4 text-center text-sm text-gray-600" x-show="processedImageUrl">
-                    <p>Click 'Download Image' to save the result</p>
-                </div>
+            <!-- Navigation -->
+            <div class="flex justify-between pt-6">
+                <button id="prev-btn" class="hidden px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition duration-200">
+                    Previous Step
+                </button>
+                <button id="next-btn" class="hidden px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition duration-200">
+                    Next Step
+                </button>
+                <button id="restart-btn" class="hidden px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition duration-200">
+                    Start Over
+                </button>
             </div>
         </div>
 
-        <div class="mt-8 text-center text-gray-600 text-sm">
-            <p>This application uses AI to remove image backgrounds and generate new ones.</p>
+        <!-- Notifications -->
+        <div id="notification" class="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 transform transition-transform duration-300 translate-y-full">
+            <div id="notification-content" class="flex items-center"></div>
         </div>
     </div>
 
     <script>
-        function imageProcessor() {
-            return {
-                uploadedImage: null,
-                uploadedImageUrl: null,
-                processedImageUrl: null,
-                previewImage: null,
-                backgroundPrompt: '',
-                isProcessing: false,
-                
-                handleFileUpload(event) {
-                    const file = event.target.files[0];
-                    if (file) {
-                        this.uploadedImage = file;
-                        this.uploadedImageUrl = URL.createObjectURL(file);
-                        this.previewImage = this.uploadedImageUrl;
-                        this.processedImageUrl = null;
-                    }
-                },
-                
-                async removeBackground() {
-                    if (!this.uploadedImage) {
-                        alert('Please upload an image first');
-                        return;
-                    }
-                    
-                    this.isProcessing = true;
-                    
-                    try {
-                        const formData = new FormData();
-                        formData.append('file', this.uploadedImage);
-                        
-                        const response = await fetch('/remove_background', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        const result = await response.json();
-                        
-                        if (result.success) {
-                            this.processedImageUrl = result.url;
-                            this.previewImage = result.url;
-                        } else {
-                            alert('Error: ' + (result.error || 'Failed to process image'));
-                        }
-                    } catch (error) {
-                        console.error('Error:', error);
-                        alert('An error occurred while processing the image');
-                    } finally {
-                        this.isProcessing = false;
-                    }
-                },
-                
-                async generateBackground() {
-                    if (!this.backgroundPrompt) {
-                        alert('Please enter a background prompt');
-                        return;
-                    }
-                    
-                    this.isProcessing = true;
-                    
-                    try {
-                        const response = await fetch(`/generate_background?background_prompt=${encodeURIComponent(this.backgroundPrompt)}`, {
-                            method: 'POST'
-                        });
-                        
-                        const result = await response.json();
-                        
-                        if (result.success) {
-                            this.processedImageUrl = result.url;
-                            this.previewImage = result.url;
-                        } else {
-                            alert('Error: ' + (result.error || 'Failed to generate background'));
-                        }
-                    } catch (error) {
-                        console.error('Error:', error);
-                        alert('An error occurred while generating the background');
-                    } finally {
-                        this.isProcessing = false;
-                    }
-                },
-                
-                downloadImage() {
-                    if (this.processedImageUrl) {
-                        const link = document.createElement('a');
-                        link.href = this.processedImageUrl;
-                        link.download = 'processed-image.png';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    }
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const fileInput = document.getElementById('fileInput');
+            const dropzone = document.getElementById('dropzone');
+            const uploadSection = document.getElementById('upload-section');
+            const removeBgSection = document.getElementById('remove-bg-section');
+            const generateBgSection = document.getElementById('generate-bg-section');
+            const compositeSection = document.getElementById('composite-section');
+            const originalImage = document.getElementById('original-image');
+            const noBgImage = document.getElementById('no-bg-image');
+            const transparentImage = document.getElementById('transparent-image');
+            const generatedBgImage = document.getElementById('generated-bg-image');
+            const removeBgBtn = document.getElementById('remove-bg-btn');
+            const generateBgBtn = document.getElementById('generate-bg-btn');
+            const bgPromptInput = document.getElementById('bg-prompt');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const restartBtn = document.getElementById('restart-btn');
+            const noBgPlaceholder = document.getElementById('no-bg-placeholder');
+            const generatedBgPlaceholder = document.getElementById('generated-bg-placeholder');
+            const bgRemoveLoader = document.getElementById('bg-remove-loader');
+            const bgGenerateLoader = document.getElementById('bg-generate-loader');
+            const createCompositeBtn = document.getElementById('create-composite-btn');
+            const compositeCanvas = document.getElementById('composite-canvas');
+            const compositeResult = document.getElementById('composite-result');
+            const compositePlaceholder = document.getElementById('composite-placeholder');
+            const downloadBtn = document.getElementById('download-btn');
+            
+            // Step indicators
+            const step2 = document.getElementById('step-2');
+            const step3 = document.getElementById('step-3');
+            const line1 = document.getElementById('line-1');
+            const line2 = document.getElementById('line-2');
+
+            // Current step and saved data
+            let currentStep = 1;
+            let uploadedFile = null;
+            let noBgImageUrl = null;
+            let generatedBgImageUrl = null;
+
+            // Handle file selection
+            fileInput.addEventListener('change', function(e) {
+                if (fileInput.files && fileInput.files[0]) {
+                    handleFileUpload(fileInput.files[0]);
                 }
-            };
-        }
+            });
+
+            // Setup drag and drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropzone.classList.add('active');
+            }
+
+            function unhighlight() {
+                dropzone.classList.remove('active');
+            }
+
+            dropzone.addEventListener('drop', function(e) {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+                handleFileUpload(file);
+            });
+
+            dropzone.addEventListener('click', function() {
+                fileInput.click();
+            });
+
+            // Handle file upload and preview
+            function handleFileUpload(file) {
+                if (file.type.match('image.*')) {
+                    uploadedFile = file;
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        originalImage.src = e.target.result;
+                        goToStep(2);
+                    };
+                    
+                    reader.readAsDataURL(file);
+                } else {
+                    showNotification('Please upload an image file (PNG, JPG, JPEG)', 'error');
+                }
+            }
+
+            // Remove background
+            removeBgBtn.addEventListener('click', async function() {
+                if (!uploadedFile) {
+                    showNotification('Please upload an image first', 'error');
+                    return;
+                }
+
+                try {
+                    noBgPlaceholder.classList.add('hidden');
+                    bgRemoveLoader.classList.remove('hidden');
+                    
+                    const formData = new FormData();
+                    formData.append('file', uploadedFile);
+
+                    const response = await fetch('/remove_background', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        noBgImageUrl = data.url;
+                        noBgImage.src = noBgImageUrl;
+                        noBgImage.classList.remove('hidden');
+                        transparentImage.src = noBgImageUrl;
+                        
+                        // Update step indicators
+                        step2.classList.add('step-complete');
+                        line1.classList.remove('bg-gray-300');
+                        line1.classList.add('bg-indigo-600');
+                        
+                        nextBtn.classList.remove('hidden');
+                        showNotification('Background removed successfully!', 'success');
+                    } else {
+                        throw new Error(data.error || 'Failed to remove background');
+                    }
+                } catch (error) {
+                    noBgPlaceholder.classList.remove('hidden');
+                    showNotification(error.message, 'error');
+                } finally {
+                    bgRemoveLoader.classList.add('hidden');
+                }
+            });
+
+            // Generate background
+            generateBgBtn.addEventListener('click', async function() {
+                const prompt = bgPromptInput.value.trim();
+                
+                if (!prompt) {
+                    showNotification('Please enter a background description', 'error');
+                    return;
+                }
+
+                try {
+                    generatedBgPlaceholder.classList.add('hidden');
+                    bgGenerateLoader.classList.remove('hidden');
+                    
+                    const response = await fetch(`/generate_background?background_prompt=${encodeURIComponent(prompt)}`, {
+                        method: 'POST'
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        generatedBgImageUrl = data.url;
+                        generatedBgImage.src = generatedBgImageUrl;
+                        generatedBgImage.classList.remove('hidden');
+                        
+                        // Update step indicators
+                        step3.classList.add('step-complete');
+                        line2.classList.remove('bg-gray-300');
+                        line2.classList.add('bg-indigo-600');
+                        
+                        // Show composite section
+                        compositeSection.classList.remove('hidden');
+                        
+                        showNotification('Background generated successfully!', 'success');
+                    } else {
+                        throw new Error(data.error || 'Failed to generate background');
+                    }
+                } catch (error) {
+                    generatedBgPlaceholder.classList.remove('hidden');
+                    showNotification(error.message, 'error');
+                } finally {
+                    bgGenerateLoader.classList.add('hidden');
+                }
+            });
+
+            // Create composite image
+            createCompositeBtn.addEventListener('click', function() {
+                if (!noBgImageUrl || !generatedBgImageUrl) {
+                    showNotification('Please complete all previous steps first', 'error');
+                    return;
+                }
+
+                try {
+                    compositePlaceholder.classList.add('hidden');
+                    
+                    // Create composite image
+                    const bg = new Image();
+                    const fg = new Image();
+                    
+                    bg.onload = function() {
+                        compositeCanvas.width = bg.width;
+                        compositeCanvas.height = bg.height;
+                        
+                        const ctx = compositeCanvas.getContext('2d');
+                        ctx.drawImage(bg, 0, 0);
+                        
+                        fg.onload = function() {
+                            // Calculate positioning to center the foreground
+                            const scale = Math.min(
+                                bg.width / fg.width * 0.8, 
+                                bg.height / fg.height * 0.8
+                            );
+                            
+                            const newWidth = fg.width * scale;
+                            const newHeight = fg.height * scale;
+                            
+                            const x = (bg.width - newWidth) / 2;
+                            const y = (bg.height - newHeight) / 2;
+                            
+                            ctx.drawImage(fg, x, y, newWidth, newHeight);
+                            
+                            compositeResult.classList.remove('hidden');
+                            downloadBtn.classList.remove('hidden');
+                        };
+                        
+                        fg.src = noBgImageUrl;
+                    };
+                    
+                    bg.src = generatedBgImageUrl;
+                    
+                } catch (error) {
+                    compositePlaceholder.classList.remove('hidden');
+                    showNotification(error.message, 'error');
+                }
+            });
+
+            // Download result
+            downloadBtn.addEventListener('click', function() {
+                const link = document.createElement('a');
+                link.download = 'composite-image.png';
+                link.href = compositeCanvas.toDataURL('image/png');
+                link.click();
+            });
+
+            // Navigation buttons
+            prevBtn.addEventListener('click', function() {
+                goToStep(currentStep - 1);
+            });
+
+            nextBtn.addEventListener('click', function() {
+                goToStep(currentStep + 1);
+            });
+
+            restartBtn.addEventListener('click', function() {
+                // Reset everything
+                uploadedFile = null;
+                noBgImageUrl = null;
+                generatedBgImageUrl = null;
+                
+                // Clear images
+                originalImage.src = '';
+                noBgImage.src = '';
+                noBgImage.classList.add('hidden');
+                transparentImage.src = '';
+                generatedBgImage.src = '';
+                generatedBgImage.classList.add('hidden');
+                
+                // Reset placeholders
+                noBgPlaceholder.classList.remove('hidden');
+                generatedBgPlaceholder.classList.remove('hidden');
+                compositePlaceholder.classList.remove('hidden');
+                compositeResult.classList.add('hidden');
+                
+                // Reset step indicators
+                step2.classList.remove('step-active', 'step-complete');
+                step3.classList.remove('step-active', 'step-complete');
+                line1.classList.add('bg-gray-300');
+                line1.classList.remove('bg-indigo-600');
+                line2.classList.add('bg-gray-300');
+                line2.classList.remove('bg-indigo-600');
+                
+                // Hide sections
+                removeBgSection.classList.add('hidden');
+                generateBgSection.classList.add('hidden');
+                compositeSection.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
+                
+                // Show upload section
+                uploadSection.classList.remove('hidden');
+                
+                // Reset buttons
+                prevBtn.classList.add('hidden');
+                nextBtn.classList.add('hidden');
+                restartBtn.classList.add('hidden');
+                
+                // Reset step
+                currentStep = 1;
+                
+                showNotification('Starting over with a clean slate', 'info');
+            });
+
+            // Step navigation
+            function goToStep(step) {
+                // Hide all sections first
+                uploadSection.classList.add('hidden');
+                removeBgSection.classList.add('hidden');
+                generateBgSection.classList.add('hidden');
+                
+                // Reset step indicators
+                step2.classList.remove('step-active');
+                step3.classList.remove('step-active');
+                
+                // Show navigation buttons
+                prevBtn.classList.remove('hidden');
+                nextBtn.classList.add('hidden');
+                restartBtn.classList.remove('hidden');
+                
+                // Handle specific step logic
+                switch(step) {
+                    case 1:
+                        uploadSection.classList.remove('hidden');
+                        prevBtn.classList.add('hidden');
+                        restartBtn.classList.add('hidden');
+                        break;
+                    case 2:
+                        removeBgSection.classList.remove('hidden');
+                        step2.classList.add('step-active');
+                        if (noBgImageUrl) {
+                            nextBtn.classList.remove('hidden');
+                        }
+                        break;
+                    case 3:
+                        generateBgSection.classList.remove('hidden');
+                        step3.classList.add('step-active');
+                        nextBtn.classList.add('hidden'); // No next step after this
+                        break;
+                }
+                
+                currentStep = step;
+            }
+
+            // Show notification
+            function showNotification(message, type = 'info') {
+                const notification = document.getElementById('notification');
+                const notificationContent = document.getElementById('notification-content');
+                
+                // Clear previous content
+                notificationContent.innerHTML = '';
+                
+                // Set color based on type
+                let iconColor, bgColor;
+                let icon = '';
+                
+                switch(type) {
+                    case 'success':
+                        iconColor = 'text-green-500';
+                        bgColor = 'bg-green-50 border-green-100';
+                        icon = `<svg class="w-6 h-6 ${iconColor} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>`;
+                        break;
+                    case 'error':
+                        iconColor = 'text-red-500';
+                        bgColor = 'bg-red-50 border-red-100';
+                        icon = `<svg class="w-6 h-6 ${iconColor} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>`;
+                        break;
+                    default:
+                        iconColor = 'text-blue-500';
+                        bgColor = 'bg-blue-50 border-blue-100';
+                        icon = `<svg class="w-6 h-6 ${iconColor} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>`;
+                }
+                
+                notification.className = `fixed bottom-4 right-4 ${bgColor} border shadow-lg rounded-lg p-4 transform transition-transform duration-300`;
+                
+                // Create notification content
+                notificationContent.innerHTML = `
+                    ${icon}
+                    <span class="ml-2">${message}</span>
+                `;
+                
+                // Show notification
+                notification.classList.remove('translate-y-full');
+                
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    notification.classList.add('translate-y-full');
+                }, 3000);
+            }
+
+            // Initialize
+            goToStep(1);
+        });
     </script>
 </body>
 </html>
