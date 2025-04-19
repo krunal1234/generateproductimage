@@ -2,6 +2,7 @@ import torch
 import torchvision.transforms as transforms
 import numpy as np
 from PIL import Image
+import cv2
 
 # Suggested preprocess enhancement
 def preprocess_image(image: np.ndarray, size: List[int]) -> torch.Tensor:
